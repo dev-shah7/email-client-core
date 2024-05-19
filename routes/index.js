@@ -1,12 +1,20 @@
 const express = require('express');
-const isAuthenticated = require('../middleware/isAuthenticated');
+const passport = require('passport');
 const router = express.Router();
 
 router.get('/', (req, res) => {
   res.send('Home Page');
 });
 
-router.get('/protected', isAuthenticated, (req, res) => {
-  res.status(200).json({ message: 'You have accessed the protected route' });
-});
+router.get(
+  '/profile',
+  passport.authenticate('jwt', { session: false }),
+  async (req, res, next) => {
+    console.log('Req user: ', req.user);
+    res.json({
+      message: 'Successfully accessed profile route',
+      user: req.user,
+    });
+  }
+);
 module.exports = router;

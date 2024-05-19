@@ -1,5 +1,6 @@
 const isAuthenticated = (req, res, next) => {
-  if (req.isAuthenticated()) {
+  console.log('Red: ', req.user);
+  if (req.user) {
     return next();
   }
   res.status(401).json({ message: 'Unauthorized' });

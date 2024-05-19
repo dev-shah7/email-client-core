@@ -1,5 +1,6 @@
 const passport = require('passport');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const LocalStrategy = require('passport-local').Strategy;
 const OutlookStrategy = require('passport-outlook').Strategy;
 const JwtStrategy = require('passport-jwt').Strategy;
@@ -33,6 +34,17 @@ passport.use(
   )
 );
 
+passport.use(
+  new JwtStrategy(jwtOptions, async (payload, done) => {
+    try {
+      const user = await User.findById(payload.id);
+      if (user) return done(null, user);
+    } catch (error) {
+      return done(error);
+    }
+  })
+);
+
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
@@ -62,40 +74,30 @@ passport.use(
     },
     async (req, accessToken, refreshToken, profile, done) => {
       try {
-        if (req.user) {
-          let user = await User.findOne({ outlookId: profile.id });
+        console.log('Access token: ', accessToken);
+        console.log('Profile: ', JSON.stringify(profile));
 
-          if (user && user.id !== req.user.id) {
-            return done(
-              new Error('Outlook account already linked to another user.')
-            );
-          }
-
-          user = await User.findById(req.user.id);
-          user.outlookId = profile.id;
-          user.accessToken = accessToken;
-          user.refreshToken = refreshToken;
-          await user.save();
-          return done(null, user);
-        } else {
-          let user = await User.findOne({ outlookId: profile.id });
-          if (!user) {
-            user = new User({
-              outlookId: profile.id,
-              name: profile.displayName,
-              email: profile.emails[0].value,
-              accessToken: accessToken,
-              refreshToken: refreshToken,
-            });
-            await user.save();
-          } else {
-            user.accessToken = accessToken;
-            user.refreshToken = refreshToken;
-            await user.save();
-          }
-          return done(null, user);
+        const parts = accessToken.split('.');
+        if (parts.length !== 3) {
+          throw new Error('Invalid access token format');
         }
+
+        const decodedToken = jwt.decode(accessToken, { complete: true });
+        console.log('Decoded JWT: ', decodedToken);
+
+        let user = await User.findById('6649165f87cecefb183792c1');
+        if (!user) {
+          throw new Error('User not found');
+        }
+
+        user.outlookId = profile.id;
+        user.accessToken = accessToken;
+        user.refreshToken = refreshToken;
+        await user.save();
+
+        return done(null, user);
       } catch (error) {
+        console.error('Error in strategy callback:', error);
         return done(error, null);
       }
     }
