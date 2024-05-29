@@ -1,7 +1,5 @@
 const mongoose = require('mongoose');
-const config = require('.');
-
-const url = config.mongoDBURI;
+const { MONGO_DB_URI } = require('../authConfig');
 
 const connectionParams = {
   useNewUrlParser: true,
@@ -10,7 +8,7 @@ const connectionParams = {
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(url, connectionParams);
+    await mongoose.connect(MONGO_DB_URI, connectionParams);
     console.log('Connected to the database');
   } catch (err) {
     console.error(`Error connecting to the database: ${err}`);

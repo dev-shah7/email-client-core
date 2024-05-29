@@ -1,9 +1,9 @@
-const isAuthenticated = (req, res, next) => {
-  console.log('Red: ', req.user);
-  if (req.user) {
-    return next();
+function isAuthenticated(req, res, next) {
+  if (!req.session.isAuthenticated) {
+    return res.redirect('/auth/signin');
   }
-  res.status(401).json({ message: 'Unauthorized' });
-};
+
+  next();
+}
 
 module.exports = isAuthenticated;

@@ -22,6 +22,9 @@ const userSchema = new mongoose.Schema({
   refreshToken: {
     type: String,
   },
+  mailboxGuid: {
+    type: String,
+  },
 });
 
 module.exports = mongoose.model('User', userSchema);
