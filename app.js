@@ -12,6 +12,7 @@ const msal = require('@azure/msal-node');
 
 const authRouter = require('./routes/auth');
 const emailRouter = require('./routes/email');
+const client = require('./elasticsearch/client');
 
 const app = express();
 
@@ -34,6 +35,7 @@ const msalConfig = {
   },
 };
 
+app.locals.esClient = client;
 app.locals.msalClient = new msal.ConfidentialClientApplication(msalConfig);
 
 app.use(
@@ -70,6 +72,15 @@ app.use(cookieParser());
 app.use('/', indexRouter);
 app.use('/auth', authRouter);
 app.use('/emails', emailRouter);
+
+app.use('/test-elasticsearch', async (req, res, next) => {
+  try {
+    const result = await client.ping();
+    res.json({ message: 'Elasticsearch is running', result });
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.use(function (req, res, next) {
   next(createError(404));

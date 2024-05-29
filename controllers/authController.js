@@ -1,50 +1,127 @@
-// // controllers/authController.js
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
-// const bcrypt = require('bcrypt');
-// const jwt = require('jsonwebtoken');
-// const passport = require('passport');
-// const User = require('../models/User');
+exports.signup = async (req, res) => {
+  const esClient = req.app.locals.esClient;
+  const { username, password } = req.body;
 
-// exports.register = async (req, res) => {
-//   const { name, email, password } = req.body;
-//   try {
-//     const salt = await bcrypt.genSalt(10);
-//     const hashedPassword = await bcrypt.hash(password, salt);
-//     const newUser = new User({ name, email, password: hashedPassword });
-//     await newUser.save();
-//     res.status(201).json({ message: 'User registered successfully' });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Error registering user', error });
-//   }
-// };
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-// exports.login = (req, res, next) => {
-//   passport.authenticate('local', (err, user, info) => {
-//     if (err) return next(err);
-//     if (!user) return res.status(400).json({ message: info.message });
+    const indexExists = await esClient.indices.exists({ index: 'users' });
 
-//     req.logIn(user, (err) => {
-//       if (err) return next(err);
-//       const accessToken = jwt.sign(
-//         {
-//           id: user._id,
-//         },
-//         'secret',
-//         { expiresIn: '1d' }
-//       );
+    console.log('Index exists:', indexExists.body);
+    if (!indexExists.body) {
+      const response = await esClient.index({
+        index: 'users',
+        body: {
+          username,
+          password: hashedPassword,
+          userAccountId: '',
+          displayName: '',
+          email: '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        refresh: true,
+      });
 
-//       return res.status(200).json({
-//         message: 'Logged in successfully',
-//         data: {
-//           user,
-//           accessToken,
-//         },
-//       });
-//     });
-//   })(req, res, next);
-// };
+      const token = jwt.sign(
+        { username, localId: response._id },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
 
-exports.signin = async function (req, res) {
+      return res
+        .status(201)
+        .send({ message: 'User created successfully', token });
+    } else {
+      const searchResponse = await esClient.search({
+        index: 'users',
+        body: {
+          query: {
+            match: { username },
+          },
+        },
+      });
+
+      if (searchResponse.body.hits.total.value > 0) {
+        return res.status(409).send({ message: `${username} already exists!` });
+      } else {
+        const response = await esClient.index({
+          index: 'users',
+          body: {
+            username,
+            password: hashedPassword,
+            userAccountId: '',
+            displayName: '',
+            email: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          refresh: true,
+        });
+
+        console.log('Response:', response);
+        const token = jwt.sign(
+          { username, localId: response._id },
+          process.env.JWT_SECRET,
+          { expiresIn: '1h' }
+        );
+
+        return res
+          .status(201)
+          .send({ message: 'User created successfully', token });
+      }
+    }
+  } catch (error) {
+    console.error('Error creating user:', error);
+    return res.status(500).send({ error: 'Error creating user' });
+  }
+};
+
+exports.login = async (req, res) => {
+  const esClient = req.app.locals.esClient;
+  const { username, password } = req.body;
+
+  try {
+    const body = await esClient.search({
+      index: 'users',
+      body: {
+        query: {
+          match: { username },
+        },
+      },
+    });
+
+    if (body.hits.total.value === 0) {
+      return res.status(400).send({ error: 'Invalid username or password' });
+    }
+
+    const user = body.hits.hits[0]._source;
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.status(400).send({ error: 'Invalid username or password' });
+    }
+
+    const token = jwt.sign(
+      { username, localId: body.hits.hits[0]._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    req.session.token = token;
+
+    res.status(200).send({ message: 'Logged in successfully', token });
+  } catch (error) {
+    console.error('Error logging in user:', error);
+    res.status(500).send({ error: 'Error logging in user' });
+  }
+};
+
+exports.outlook = async function (req, res) {
   const scopes =
     process.env.OAUTH_SCOPES || 'https://graph.microsoft.com/.default';
   const urlParameters = {
@@ -95,12 +172,58 @@ exports.outlookCallback = async function (req, res) {
     };
 
     req.session.userId = response.account.homeAccountId;
+    req.session.idToken = response.idToken;
+    req.session.accessToken = response.accessToken;
 
     req.app.locals.users[req.session.userId] = {
       displayName: user.displayName,
       email: user.mail || user.userPrincipalName,
       timeZone: user.mailboxSettings.timeZone,
     };
+
+    const esClient = req.app.locals.esClient;
+
+    const indexExists = await esClient.indices.exists({ index: 'users' });
+
+    console.log('Index Exisist in outlook : ', indexExists);
+    if (!indexExists) {
+      await esClient.index({
+        index: 'users',
+        body: {
+          userAccountId: tokenResponse.account.homeAccountId,
+          displayName: user.displayName,
+          email: user.email || user.userPrincipalName,
+        },
+      });
+
+      const emails = await readEmails(
+        req.app.locals.msalClient,
+        req.session.userId
+      );
+
+      res.status(200).send({ message: 'ms oauth successful', emails });
+    } else {
+      const body = await esClient.search({
+        index: 'users',
+        body: {
+          query: {
+            match: { email: user.userPrincipalName },
+          },
+        },
+      });
+
+      if (body && body.hits.total.value > 0) {
+        const emails = await readEmails(
+          req.app.locals.msalClient,
+          req.session.userId
+        );
+
+        return res.status(200).send({
+          message: `ms oauth successful`,
+          emails,
+        });
+      }
+    }
   } catch (error) {
     req.flash('error_msg', {
       message: 'Error completing authentication',
