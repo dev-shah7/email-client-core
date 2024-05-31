@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Authentication</title>
+  </head>
+  <body>
+    <h1>Authentication Page</h1>
+    <button id="authButton">Authenticate with Outlook</button>
+
+    <script>
+      document.getElementById('authButton').addEventListener('click', () => {
+        window.location.href = '/auth/outlook';
+      });
+    </script>
+  </body>
+</html>

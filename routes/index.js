@@ -1,11 +1,10 @@
 const express = require('express');
-const passport = require('passport');
+const path = require('path');
+
 const router = express.Router();
 
 router.get('/', (req, res) => {
-  res
-    .status(200)
-    .json({ message: 'Success', session: req.app.locals.msalClient });
+  res.sendFile(path.join(__dirname, '../public/auth.html'));
 });
 
 router.get('/me', (req, res) => {

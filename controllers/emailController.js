@@ -1,12 +1,9 @@
+const { default: axios } = require('axios');
 const graph = require('../graph');
 const { default: syncEmails } = require('../sync');
 
 exports.getEmails = async (req, res) => {
-  const accessToken = req.session.accessToken;
-  const idToken = req.session.idToken;
-  console.log('ACCESS_TOKEN::', req.app.locals.users);
   try {
-    console.log('Response: ', req.session.userId);
     const emails = await graph.getEmails(
       req.app.locals.msalClient,
       req.session.userId
@@ -14,7 +11,7 @@ exports.getEmails = async (req, res) => {
     console.log('Emails: ', emails);
     res.status(200).send({ message: 'ms oauth successful', emails });
   } catch (error) {
-    console.error('Error fetching emails:', error.message);
+    console.error('Error fetching emails:', error);
   }
 };
 

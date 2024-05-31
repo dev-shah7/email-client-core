@@ -2,6 +2,7 @@ const createError = require('http-errors');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
+const path = require('path');
 require('dotenv').config();
 
 const indexRouter = require('./routes/index');
@@ -12,9 +13,12 @@ const msal = require('@azure/msal-node');
 
 const authRouter = require('./routes/auth');
 const emailRouter = require('./routes/email');
+
 const client = require('./elasticsearch/client');
 
 const app = express();
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.locals.users = {};
 
@@ -71,7 +75,15 @@ app.use(cookieParser());
 
 app.use('/', indexRouter);
 app.use('/auth', authRouter);
-app.use('/emails', emailRouter);
+app.use('/api/emails', emailRouter);
+
+app.get('/emails', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/emails.html'));
+});
+
+app.get('/api/session', (req, res) => {
+  res.json(req.session);
+});
 
 app.use('/test-elasticsearch', async (req, res, next) => {
   try {

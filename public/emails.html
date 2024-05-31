@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your Emails</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f9;
+        margin: 0;
+        padding: 20px;
+      }
+      h1 {
+        color: #333;
+      }
+      #emails {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .email-card {
+        background: #fff;
+        padding: 15px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .email-subject {
+        font-weight: bold;
+        color: #333;
+      }
+      .email-from {
+        color: #666;
+      }
+      .email-body {
+        margin-top: 10px;
+        color: #444;
+      }
+      .divider {
+        margin-top: 20px;
+        border-top: 1px solid #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Your Emails</h1>
+    <div id="emails"></div>
+
+    <script>
+      async function fetchEmails() {
+        try {
+          const response = await fetch('/api/emails');
+          const data = await response.json();
+
+          const emailContainer = document.getElementById('emails');
+
+          data.emails.value.forEach((message) => {
+            const emailDiv = document.createElement('div');
+            emailDiv.className = 'email-card';
+            emailDiv.innerHTML = `
+              <div class="email-subject">${message.subject}</div>
+              <div class="email-from">From: ${message.from.emailAddress.name} (${message.from.emailAddress.address})</div>
+              <div class="email-body">${message.body.content}</div>
+            `;
+            emailContainer.appendChild(emailDiv);
+          });
+        } catch (error) {
+          console.error('Error fetching emails:', error);
+        }
+      }
+
+      fetchEmails();
+    </script>
+  </body>
+</html>

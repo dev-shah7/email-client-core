@@ -7,10 +7,8 @@ exports.signup = async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const indexExists = await esClient.indices.exists({ index: 'users' });
 
-    console.log('Index exists:', indexExists.body);
     if (!indexExists.body) {
       const response = await esClient.index({
         index: 'users',
@@ -159,6 +157,8 @@ exports.outlookCallback = async function (req, res) {
     );
 
     req.session.userId = response.account.homeAccountId;
+    req.session.accessToken = response.accessToken;
+    req.session.idToken = response.idToken;
 
     const user = await graph.getUserDetails(
       req.app.locals.msalClient,
@@ -170,10 +170,6 @@ exports.outlookCallback = async function (req, res) {
       email: user.mail || user.userPrincipalName,
       timeZone: user.mailboxSettings.timeZone,
     };
-
-    req.session.userId = response.account.homeAccountId;
-    req.session.idToken = response.idToken;
-    req.session.accessToken = response.accessToken;
 
     req.app.locals.users[req.session.userId] = {
       displayName: user.displayName,
@@ -231,7 +227,7 @@ exports.outlookCallback = async function (req, res) {
     });
   }
 
-  res.redirect('/');
+  res.redirect('/emails');
 };
 
 exports.signout = async function (req, res) {
